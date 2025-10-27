@@ -1,29 +1,15 @@
-// Login API endpoint
-import { generateToken } from "@/lib/auth"
-import { type NextRequest, NextResponse } from "next/server"
+// Logout API endpoint
+import { NextResponse } from "next/server"
 
-// Mock user credentials
-const VALID_USERNAME = "testuser"
-const VALID_PASSWORD = "testpass"
+export async function POST() {
+  const response = NextResponse.json({ message: "Logged out successfully" }, { status: 200 })
 
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json()
-    const { username, password } = body
+  response.cookies.set("auth-token", "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 0,
+  })
 
-    if (username === VALID_USERNAME && password === VALID_PASSWORD) {
-      const token = await generateToken("1", username)
-      return NextResponse.json(
-        {
-          token,
-          user: { id: "1", username },
-        },
-        { status: 200 },
-      )
-    }
-
-    return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
-  } catch (error) {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
-  }
+  return response
 }
