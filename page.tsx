@@ -1,77 +1,72 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useParams, useRouter } from "next/navigation"
-import Link from "next/link"
-import { ArrowLeft, Mail, Phone, Globe, Building2 } from "lucide-react"
+import { useEffect, useState, useMemo } from "react"
 import { Sidebar } from "@/components/sidebar"
 import { Header } from "@/components/header"
-import { PostList } from "@/components/post-list"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { fetchUserById, fetchPostsByUserId } from "@/lib/api"
-import type { User, Post } from "@/lib/types"
+import { SearchBar } from "@/components/search-bar"
+import { UserTable } from "@/components/user-table"
+import { Pagination } from "@/components/pagination"
+import { fetchUsers } from "@/lib/api"
+import type { User } from "@/lib/types"
 
-export default function UserDetailPage() {
-  const params = useParams()
-  const router = useRouter()
-  const userId = Number(params.id)
+const ITEMS_PER_PAGE = 10
 
-  const [user, setUser] = useState<User | null>(null)
-  const [posts, setPosts] = useState<Post[]>([])
+export default function UsersPage() {
+  const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState("")
+  const [searchTerm, setSearchTerm] = useState("")
+  const [currentPage, setCurrentPage] = useState(1)
+  const [sortBy, setSortBy] = useState("name")
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc")
 
   useEffect(() => {
-    const loadUserData = async () => {
+    const loadUsers = async () => {
       try {
-        const userData = await fetchUserById(userId)
-        setUser(userData as User)
-
-        const postsData = await fetchPostsByUserId(userId)
-        setPosts(postsData as Post[])
-      } catch (err) {
-        setError("Failed to load user data")
-        console.error(err)
+        const data = await fetchUsers()
+        setUsers(data as User[])
+      } catch (error) {
+        console.error("Failed to load users:", error)
       } finally {
         setLoading(false)
       }
     }
 
-    loadUserData()
-  }, [userId])
+    loadUsers()
+  }, [])
 
-  if (loading) {
-    return (
-      <div className="flex h-screen bg-background">
-        <Sidebar />
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <Header />
-          <main className="flex-1 flex items-center justify-center">
-            <p className="text-muted-foreground">Loading user details...</p>
-          </main>
-        </div>
-      </div>
+  const filteredAndSortedUsers = useMemo(() => {
+    const filtered = users.filter(
+      (user) =>
+        user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.username.toLowerCase().includes(searchTerm.toLowerCase()),
     )
-  }
 
-  if (error || !user) {
-    return (
-      <div className="flex h-screen bg-background">
-        <Sidebar />
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <Header />
-          <main className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <p className="text-destructive mb-4">{error || "User not found"}</p>
-              <Link href="/users">
-                <Button>Back to Users</Button>
-              </Link>
-            </div>
-          </main>
-        </div>
-      </div>
-    )
+    filtered.sort((a, b) => {
+      const aValue = a[sortBy as keyof User]
+      const bValue = b[sortBy as keyof User]
+
+      if (typeof aValue === "string" && typeof bValue === "string") {
+        return sortOrder === "asc" ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue)
+      }
+
+      return 0
+    })
+
+    return filtered
+  }, [users, searchTerm, sortBy, sortOrder])
+
+  const totalPages = Math.ceil(filteredAndSortedUsers.length / ITEMS_PER_PAGE)
+  const paginatedUsers = filteredAndSortedUsers.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
+
+  const handleSort = (field: string) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc")
+    } else {
+      setSortBy(field)
+      setSortOrder("asc")
+    }
+    setCurrentPage(1)
   }
 
   return (
@@ -80,84 +75,25 @@ export default function UserDetailPage() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
         <main className="flex-1 overflow-auto p-6">
-          <div className="max-w-4xl mx-auto space-y-6">
-            <Link href="/users">
-              <Button variant="outline" className="gap-2 bg-transparent">
-                <ArrowLeft className="w-4 h-4" />
-                Back to Users
-              </Button>
-            </Link>
+          <div className="max-w-7xl mx-auto space-y-6">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground mb-2">All Users</h1>
+              <p className="text-muted-foreground">Browse and manage all users in the system</p>
+            </div>
 
-            <div className="grid gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-2xl">{user.name}</CardTitle>
-                  <CardDescription>@{user.username}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="flex items-center gap-3">
-                      <Mail className="w-5 h-5 text-muted-foreground" />
-                      <div>
-                        <p className="text-sm text-muted-foreground">Email</p>
-                        <p className="font-medium">{user.email}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Phone className="w-5 h-5 text-muted-foreground" />
-                      <div>
-                        <p className="text-sm text-muted-foreground">Phone</p>
-                        <p className="font-medium">{user.phone}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Globe className="w-5 h-5 text-muted-foreground" />
-                      <div>
-                        <p className="text-sm text-muted-foreground">Website</p>
-                        <p className="font-medium">{user.website}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Building2 className="w-5 h-5 text-muted-foreground" />
-                      <div>
-                        <p className="text-sm text-muted-foreground">Company</p>
-                        <p className="font-medium">{user.company.name}</p>
-                      </div>
-                    </div>
-                  </div>
+            <div className="bg-card rounded-lg border border-border p-6 space-y-6">
+              <SearchBar value={searchTerm} onChange={setSearchTerm} />
 
-                  <div className="pt-4 border-t border-border">
-                    <h4 className="font-semibold mb-2">Address</h4>
-                    <p className="text-sm text-muted-foreground">
-                      {user.address.street}, {user.address.suite}
-                      <br />
-                      {user.address.city}, {user.address.zipcode}
-                    </p>
-                  </div>
-
-                  <div className="pt-4 border-t border-border">
-                    <h4 className="font-semibold mb-2">Company Details</h4>
-                    <p className="text-sm text-muted-foreground mb-1">{user.company.catchPhrase}</p>
-                    <p className="text-sm text-muted-foreground">{user.company.bs}</p>
-                  </div>
-
-                  <div className="pt-4">
-                    <Link href={`/users/${user.id}/edit`}>
-                      <Button>Edit User</Button>
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>User Posts</CardTitle>
-                  <CardDescription>{posts.length} posts published</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <PostList posts={posts} />
-                </CardContent>
-              </Card>
+              {loading ? (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground">Loading users...</p>
+                </div>
+              ) : (
+                <>
+                  <UserTable users={paginatedUsers} sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} />
+                  <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+                </>
+              )}
             </div>
           </div>
         </main>
