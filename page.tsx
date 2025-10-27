@@ -1,103 +1,101 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
-import { Sidebar } from "@/components/sidebar"
-import { Header } from "@/components/header"
-import { SearchBar } from "@/components/search-bar"
-import { UserTable } from "@/components/user-table"
-import { Pagination } from "@/components/pagination"
-import { fetchUsers } from "@/lib/api"
-import type { User } from "@/lib/types"
+import type React from "react"
 
-const ITEMS_PER_PAGE = 10
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
-export default function DashboardPage() {
-  const [users, setUsers] = useState<User[]>([])
-  const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [currentPage, setCurrentPage] = useState(1)
-  const [sortBy, setSortBy] = useState("name")
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc")
+export default function LoginPage() {
+  const router = useRouter()
+  const [username, setUsername] = useState("")
+  const [password, setPassword] = useState("")
+  const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    const loadUsers = async () => {
-      try {
-        const data = await fetchUsers()
-        setUsers(data as User[])
-      } catch (error) {
-        console.error("Failed to load users:", error)
-      } finally {
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError("")
+    setLoading(true)
+
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      })
+
+      if (!response.ok) {
+        setError("Invalid credentials")
         setLoading(false)
-      }
-    }
-
-    loadUsers()
-  }, [])
-
-  const filteredAndSortedUsers = useMemo(() => {
-    const filtered = users.filter(
-      (user) =>
-        user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.username.toLowerCase().includes(searchTerm.toLowerCase()),
-    )
-
-    filtered.sort((a, b) => {
-      const aValue = a[sortBy as keyof User]
-      const bValue = b[sortBy as keyof User]
-
-      if (typeof aValue === "string" && typeof bValue === "string") {
-        return sortOrder === "asc" ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue)
+        return
       }
 
-      return 0
-    })
+      const data = await response.json()
 
-    return filtered
-  }, [users, searchTerm, sortBy, sortOrder])
+      // Store token in cookie
+      document.cookie = `auth-token=${data.token}; path=/; max-age=86400`
 
-  const totalPages = Math.ceil(filteredAndSortedUsers.length / ITEMS_PER_PAGE)
-  const paginatedUsers = filteredAndSortedUsers.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
-
-  const handleSort = (field: string) => {
-    if (sortBy === field) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc")
-    } else {
-      setSortBy(field)
-      setSortOrder("asc")
+      router.push("/dashboard")
+    } catch (err) {
+      setError("An error occurred. Please try again.")
+      setLoading(false)
     }
-    setCurrentPage(1)
   }
 
   return (
-    <div className="flex h-screen bg-background">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-auto p-6">
-          <div className="max-w-7xl mx-auto space-y-6">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground mb-2">Dashboard</h1>
-              <p className="text-muted-foreground">Welcome to your user management dashboard</p>
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="space-y-2">
+          <CardTitle className="text-2xl">Login</CardTitle>
+          <CardDescription>Enter your credentials to access the dashboard</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-2">
+              <label htmlFor="username" className="text-sm font-medium">
+                Username
+              </label>
+              <Input
+                id="username"
+                type="text"
+                placeholder="testuser"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                disabled={loading}
+              />
             </div>
-
-            <div className="bg-card rounded-lg border border-border p-6 space-y-6">
-              <SearchBar value={searchTerm} onChange={setSearchTerm} />
-
-              {loading ? (
-                <div className="text-center py-12">
-                  <p className="text-muted-foreground">Loading users...</p>
-                </div>
-              ) : (
-                <>
-                  <UserTable users={paginatedUsers} sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} />
-                  <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
-                </>
-              )}
+            <div className="space-y-2">
+              <label htmlFor="password" className="text-sm font-medium">
+                Password
+              </label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="testpass"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
+              />
             </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Logging in..." : "Login"}
+            </Button>
+          </form>
+          <div className="mt-4 p-3 bg-muted rounded-md text-sm">
+            <p className="font-semibold mb-2">Demo Credentials:</p>
+            <p>
+              Username: <code className="bg-background px-2 py-1 rounded">testuser</code>
+            </p>
+            <p>
+              Password: <code className="bg-background px-2 py-1 rounded">testpass</code>
+            </p>
           </div>
-        </main>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
