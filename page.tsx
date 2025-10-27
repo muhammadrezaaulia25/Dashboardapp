@@ -1,101 +1,92 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
+import { useParams, useRouter } from "next/navigation"
+import Link from "next/link"
+import { ArrowLeft } from "lucide-react"
+import { Sidebar } from "@/components/sidebar"
+import { Header } from "@/components/header"
+import { UserEditForm } from "@/components/user-edit-form"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { fetchUserById } from "@/lib/api"
+import type { User } from "@/lib/types"
 
-export default function LoginPage() {
+export default function UserEditPage() {
+  const params = useParams()
   const router = useRouter()
-  const [username, setUsername] = useState("")
-  const [password, setPassword] = useState("")
+  const userId = Number(params.id)
+
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
-  const [loading, setLoading] = useState(false)
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError("")
-    setLoading(true)
-
-    try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      })
-
-      if (!response.ok) {
-        setError("Invalid credentials")
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const userData = await fetchUserById(userId)
+        setUser(userData as User)
+      } catch (err) {
+        setError("Failed to load user data")
+        console.error(err)
+      } finally {
         setLoading(false)
-        return
       }
-
-      const data = await response.json()
-
-      // Store token in cookie
-      document.cookie = `auth-token=${data.token}; path=/; max-age=86400`
-
-      router.push("/dashboard")
-    } catch (err) {
-      setError("An error occurred. Please try again.")
-      setLoading(false)
     }
+
+    loadUser()
+  }, [userId])
+
+  if (loading) {
+    return (
+      <div className="flex h-screen bg-background">
+        <Sidebar />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <Header />
+          <main className="flex-1 flex items-center justify-center">
+            <p className="text-muted-foreground">Loading user data...</p>
+          </main>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !user) {
+    return (
+      <div className="flex h-screen bg-background">
+        <Sidebar />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <Header />
+          <main className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <p className="text-destructive mb-4">{error || "User not found"}</p>
+              <Link href="/users">
+                <Button>Back to Users</Button>
+              </Link>
+            </div>
+          </main>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-2">
-          <CardTitle className="text-2xl">Login</CardTitle>
-          <CardDescription>Enter your credentials to access the dashboard</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="username" className="text-sm font-medium">
-                Username
-              </label>
-              <Input
-                id="username"
-                type="text"
-                placeholder="testuser"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                disabled={loading}
-              />
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium">
-                Password
-              </label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="testpass"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={loading}
-              />
-            </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Logging in..." : "Login"}
-            </Button>
-          </form>
-          <div className="mt-4 p-3 bg-muted rounded-md text-sm">
-            <p className="font-semibold mb-2">Demo Credentials:</p>
-            <p>
-              Username: <code className="bg-background px-2 py-1 rounded">testuser</code>
-            </p>
-            <p>
-              Password: <code className="bg-background px-2 py-1 rounded">testpass</code>
-            </p>
+    <div className="flex h-screen bg-background">
+      <Sidebar />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <Header />
+        <main className="flex-1 overflow-auto p-6">
+          <div className="max-w-2xl mx-auto space-y-6">
+            <Link href={`/users/${user.id}`}>
+              <Button variant="outline" className="gap-2 bg-transparent">
+                <ArrowLeft className="w-4 h-4" />
+                Back to User
+              </Button>
+            </Link>
+
+            <UserEditForm user={user} />
           </div>
-        </CardContent>
-      </Card>
+        </main>
+      </div>
     </div>
   )
 }
